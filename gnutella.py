@@ -1,45 +1,9 @@
-#!/usr/bin/python
-# CS 114 Gnutella Project
-
-import socket
-import sys
 import os
-import re
-import random
-import time
-
-from uuid import getnode as getmac
 import urllib.request
-
-from twisted.internet import reactor, protocol, stdio 
+from twisted.internet import reactor, protocol 
 from twisted.protocols import basic
-from twisted.web.server import Site
-from twisted.web.static import File
-#from twisted.web import client
 
-"""
-GLOBAL DATA
-"""
-connections = []
-listener = None
-nodeID = None
-files = []
-directory = None
-logPath = None
-logFile = None
-IP = None
-port = 0
-serverPort = None
-initiating = True
-msgID = 0
-msgRoutes = {}
-msgTimeout = 3.0
-netData = []
-
-MIN_CONNS = 3
-MAX_CONNS = 10
-UNDER_PROB = 50
-OVER_PROB = 10
+from utility import *
 
 """
 GNUTELLA TWISTED CLASSES
@@ -56,11 +20,6 @@ class GnutellaProtocol(basic.LineReceiver):
     self.verified = False
 
   def connectionMade(self):
-    #inputForwarder = DataForwardingProtocol()
-    #inputForwarder.output = self.transport
-    #inputForwarder.normalizeNewlines = True
-    #stdioWrapper = stdio.StandardIO(inputForwarder)
-    #self.output = stdioWrapper
     connections.append(self)
     peer = self.transport.getPeer()
     writeLog("Connected to {0}:{1}\n".format(peer.host, peer.port))
@@ -275,155 +234,9 @@ class GnutellaFactory(protocol.ReconnectingClientFactory):
     self.port = connector.port
     writeLog("Trying to connect to {0}:{1}\n".format(self.host, self.port))
 
-#  def clientConnectionLost(self, transport, reason):
-    #reactor.stop()
-#    print "Disconnected with {0}:{1}".format(self.host, self.port)
-
   def clientConnectionFailed(self, transport, reason):
     writeLog("Retrying connection with %s:%s\n" % (transport.host, transport.port))
     global connections
     numConns = len(connections)
     if numConns == 0:
       makePeerConnection()
-
-
-"""
-GLOBAL HELPER FUNCTIONS
-"""
-def makePeerConnection(IP=None, port=None):
-  global MAX_CONNS
-  global netData
-  global connections
-  cleanPeerList()
-  numConns = len(connections)
-  if (numConns < MAX_CONNS and len(netData) > 0):
-    if numConns == 0 or shouldConnect(numConns):
-      randNode = netData[random.randint(0, len(netData)-1)]
-      if (not IP and not port):
-        IP = randNode[1] 
-        port = randNode[0]
-        netData.remove(randNode)
-      reactor.connectTCP(IP, port, GnutellaFactory(True))
-
-def shouldConnect(numConns):
-  global MIN_CONNS
-  global UNDER_PROB
-  global OVER_PROB
-  prob = random.randint(0, 99)
-  if (numConns < MIN_CONNS):
-    if (prob < UNDER_PROB):
-      return True
-  elif (prob < OVER_PROB):
-      return True
-  return False
-
-def cleanPeerList():
-  global netData
-  global connections
-  for conn in connections:
-    peer = conn.transport.getPeer()
-    peer_info = (conn.peerPort, peer.host)
-    if peer_info in netData:
-      netData.remove(peer_info)
-
-def readInput():
-  global connections
-  print("Requests files with \"GET [filename];\"")
-  pattern = re.compile("GET\s+(.+);$")
-  while(1):
-    request = input()
-    match = pattern.match(request)
-    if(match):
-      query = match.group(1)
-      if (len(connections) > 0):
-        connections[0].sendQuery(query)
-      else:
-        print("No other nodes in network at the moment") 
-    elif(request.startswith("QUIT")):
-      return
-    else:
-      print("Requests must be in the format \"GET [filename];\"\n")
-
-def writeLog(line):
-  global logFile
-  logFile = open(logPath, "a")
-  logFile.write(line)
-  logFile.close()
-
-def printLine(line):
-  print(line)
-  writeLog("{0}\n".format(line))
-
-def isValid(msgid):
-  global msgRoutes
-  global msgTimeout
-  now = time.time()
-  if msgid in msgRoutes.keys() and now - msgRoutes[msgid][1] < msgTimeout:
-    msgRoutes[msgid] = (msgRoutes[msgid][0], now)
-    return True
-  return False
-
-
-"""
-MAIN FUNCTION
-"""
-if __name__=="__main__":
-  args = sys.argv[1:]
-  hasIP = False
-  hasPort = False
-  #must redeclare variables as globals within function
-  #otherwise, python recreates a local variable 
-  targetIP = None
-  targetPort = None
-  for arg in args:
-    if(arg == "-i"):
-      hasIP = True
-    elif(arg == "-p"):
-      hasPort = True
-    elif(hasIP):
-      targetIP = arg
-      hasIP = False
-    elif(hasPort):
-      targetPort = int(arg)
-      hasPort = False
-    else:
-      directory = arg
-
-  if directory:
-    #Set up directories and log file
-    if not os.path.isdir(directory):
-      os.makedirs(directory)
-    logPath = os.path.join(directory,"output.log")
-    open(logPath, "w").close() #Create or empty current log file
-#    logFile = open(os.path.join(directory, "output.log"), "w")
-    directory = os.path.join(directory, 'files')
-    if not os.path.exists(directory):
-      os.makedirs(directory)
-    print("Run \"tail -c +0 -f {0}\" in another terminal to see output".format(logPath))
-    printLine("Using directory: {0}".format(directory))
-
-    #Set up Twisted clients
-    print(targetIP)
-    print(targetPort)
-    if(targetIP and targetPort):
-      print(reactor.connectTCP(targetIP, targetPort, GnutellaFactory(initiating)))
-      
-    listener = GnutellaFactory()
-    usedPort = reactor.listenTCP(port, listener, interface=socket.gethostbyname(socket.gethostname()))
-    host = usedPort.getHost()
-    IP = host.host
-    port2 = host.port
-    print("hehe", IP, port2)
-    nodeID = "{0}{1:05}".format(getmac(), port2)
-    printLine("IP address: {0}:{1}".format(host.host, host.port))
-    resource = File(directory)
-    fileServer = reactor.listenTCP(0, Site(resource))
-    serverPort = fileServer.getHost().port
-    printLine("File serving port: {0}".format(serverPort))
-    printLine("Node ID: {0}".format(nodeID))
-    reactor.callInThread(readInput)
-    reactor.run()
-    logFile.close()
-  else:
-    print("Must give a directory path")
-
