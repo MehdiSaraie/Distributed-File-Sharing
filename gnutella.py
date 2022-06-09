@@ -206,16 +206,15 @@ class GnutellaProtocol(basic.LineReceiver):
 			query = info[2]
 			print("Found port, ip, file: ", info)
 			# global globals.directory
-			filepath = os.path.join(globals.directory, query) 
-			if os.path.isfile(filepath):
+			filepath = os.path.join(globals.directory, query)
+			if not os.path.isfile(filepath):
 				utility.printLine("Getting file \"{0}\" from {1}:{2}".format(query, ip, port)) 
 				reactor.callInThread(self.getFile, port, ip, query, filepath)
 		else:
 			self.sendQueryHit(msgid, payload=payload)
 
 	def getFile(self, port, ip, query, filepath):
-		request = os.path.join(port, query)
-		url = "http://{0}:{1}".format(ip, request)
+		url = "http://{0}:{1}/{2}".format(ip, port, query)
 		fp = open(filepath, "w")
 		fp.write(bytes.decode(urllib.request.urlopen(url).read()))
 		fp.close()
