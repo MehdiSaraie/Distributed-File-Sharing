@@ -40,7 +40,6 @@ if __name__=="__main__":
 		if not os.path.isdir(globals.directory):
 			os.makedirs(globals.directory)
 		globals.logPath = os.path.join(globals.directory,"output.log")
-		# globals.initLogPath(os.path.join(globals.directory,"output.log"))
 		open(globals.logPath, "w").close() #Create or empty current log file
 		globals.directory = os.path.join(globals.directory, 'files')
 		if not os.path.exists(globals.directory):

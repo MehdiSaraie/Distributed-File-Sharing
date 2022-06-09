@@ -1,4 +1,4 @@
-import random, time, re
+import random, time, re, os
 from twisted.internet import reactor
 
 from constants import *
@@ -10,9 +10,7 @@ from gnutella import GnutellaFactory
 GLOBAL HELPER FUNCTIONS
 """
 def makePeerConnection(IP=None, port=None):
-	global MAX_CONNS
-	# global globals.netData
-	# global globals.connections
+	MAX_CONNS
 	cleanPeerList()
 	numConns = len(globals.connections)
 	if (numConns < MAX_CONNS and len(globals.netData) > 0):
@@ -25,9 +23,6 @@ def makePeerConnection(IP=None, port=None):
 			reactor.connectTCP(IP, port, GnutellaFactory(True))
 
 def shouldConnect(numConns):
-	global MIN_CONNS
-	global UNDER_PROB
-	global OVER_PROB
 	prob = random.randint(0, 99)
 	if (numConns < MIN_CONNS):
 		if (prob < UNDER_PROB):
@@ -37,8 +32,6 @@ def shouldConnect(numConns):
 	return False
 
 def cleanPeerList():
-	# global globals.netData
-	# global globals.connections
 	for conn in globals.connections:
 		peer = conn.transport.getPeer()
 		peer_info = (conn.peerPort, peer.host)
@@ -46,7 +39,6 @@ def cleanPeerList():
 			globals.netData.remove(peer_info)
 
 def readInput():
-	# global globals.connections
 	print("Requests files with \"GET [filename];\"")
 	pattern = re.compile("GET\s+(.+);$")
 	while(1):
@@ -54,17 +46,20 @@ def readInput():
 		match = pattern.match(request)
 		if(match):
 			query = match.group(1)
-			if (len(globals.connections) > 0):
-				globals.connections[0].sendQuery(query)
+			filepath = os.path.join(globals.directory, query)
+			if not os.path.isfile(filepath):
+				if (len(globals.connections) > 0):
+					globals.connections[0].sendQuery(query)
+				else:
+					print("No other nodes in network at the moment")
 			else:
-				print("No other nodes in network at the moment") 
+				print("File already exists; No need to download")
 		elif(request.startswith("QUIT")):
 			return
 		else:
 			print("Requests must be in the format \"GET [filename];\"\n")
 
 def writeLog(line):
-	# global globals.logFile
 	globals.logFile = open(globals.logPath, "a")
 	globals.logFile.write(line)
 	globals.logFile.close()
@@ -74,8 +69,6 @@ def printLine(line):
 	writeLog("{0}\n".format(line))
 
 def isValid(msgid):
-	# global globals.msgRoutes
-	global msgTimeout
 	now = time.time()
 	if msgid in globals.msgRoutes.keys() and now - globals.msgRoutes[msgid][1] < MSG_TIMEOUT:
 		globals.msgRoutes[msgid] = (globals.msgRoutes[msgid][0], now)
