@@ -2,7 +2,6 @@ import random, time, re, os
 from twisted.internet import reactor
 
 from constants import *
-# from globals import *
 import globals
 from gnutella import GnutellaFactory
 
@@ -39,8 +38,8 @@ def cleanPeerList():
 			globals.netData.remove(peer_info)
 
 def readInput():
-	print("Requests files with \"GET [filename];\"")
-	pattern = re.compile("GET\s+(.+);$")
+	print("Requests files with \"GET [filename]\"")
+	pattern = re.compile("GET\s+(.+)$")
 	while(1):
 		request = input()
 		match = pattern.match(request)
@@ -57,7 +56,7 @@ def readInput():
 		elif(request.startswith("QUIT")):
 			return
 		else:
-			print("Requests must be in the format \"GET [filename];\"\n")
+			print("Requests must be in the format \"GET [filename]\"\n")
 
 def writeLog(line):
 	globals.logFile = open(globals.logPath, "a")

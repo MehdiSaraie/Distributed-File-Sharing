@@ -26,7 +26,7 @@ class GnutellaProtocol(basic.LineReceiver):
 		peer = self.transport.getPeer()
 		utility.writeLog("Connected to {0}:{1}\n".format(peer.host, peer.port))
 		if self.initiator:
-			x = "GNUTELLA CONNECT/0.4\n{0}\n;".format(globals.myPort)
+			x = "GNUTELLA CONNECT/0.4\n{0}\n$$$".format(globals.myPort)
 			self.transport.write(x.encode('utf-8'))
 			utility.writeLog("Sending GNUTELLA CONNECT to {0}:{1}\n".format(peer.host, peer.port))
 		host = self.transport.getHost()
@@ -42,9 +42,7 @@ class GnutellaProtocol(basic.LineReceiver):
 
 	def dataReceived(self, data):
 		data = bytes.decode(data)
-		peer = self.transport.getPeer()
-		#writeLog("\nData received from %s: %s" % (peer.port, data))
-		lines = data.split(";")
+		lines = data.split("$$$")
 		for line in lines:
 			if (len(line) > 0):
 				print(line)
@@ -56,10 +54,10 @@ class GnutellaProtocol(basic.LineReceiver):
 			self.peerPort = int(data.split('\n')[1])
 			utility.writeLog("Received GNUTELLA CONNECT from {0}:{1}\n".format(peer.host, peer.port))
 			if(len(globals.connections) <= MAX_CONNS):
-				self.transport.write("GNUTELLA OK\n{0}\n;".format(globals.myPort).encode('utf-8'))
+				self.transport.write("GNUTELLA OK\n{0}\n$$$".format(globals.myPort).encode('utf-8'))
 				utility.writeLog("Sending GNUTELLA OK to {0}:{1}\n".format(peer.host, peer.port))
 			else:
-				self.transport.write("WE'RE OUT OF NUTELLA\n;".encode('utf-8'))
+				self.transport.write("WE'RE OUT OF NUTELLA\n$$$".encode('utf-8'))
 				utility.writeLog("Sending WE'RE OUT OF NUTELLA to {0}:{1}\n".format(peer.host, peer.peer))
 		elif (self.initiator and not self.verified):
 			if(data.startswith("GNUTELLA OK")):
@@ -109,7 +107,7 @@ class GnutellaProtocol(basic.LineReceiver):
 		else:
 			message = self.buildHeader("00", ttl)
 			utility.writeLog("Sending PING: {0}\n".format(message))
-		message = "{0};".format(message)
+		message = "{0}$$$".format(message)
 		for cn in globals.connections:
 			print('line 116', self.transport.getHost())
 			if(msgid == None or cn != self):
@@ -119,10 +117,10 @@ class GnutellaProtocol(basic.LineReceiver):
 		IP = self.transport.getHost().host
 		header = "{0}&{1}&{2}&".format(msgid, "01", 7)
 		if payload:
-			message = "{0}{1};".format(header, payload)
+			message = "{0}{1}$$$".format(header, payload)
 			utility.writeLog("Forwarding PONG: {0}\n".format(message))
 		else:
-			message = "{0}{1}&{2};".format(header, globals.myPort, IP)
+			message = "{0}{1}&{2}$$$".format(header, globals.myPort, IP)
 			utility.writeLog("Sending PONG: {0}\n".format(message))
 		globals.msgRoutes[msgid][0].transport.write(message.encode('utf-8'))
 
@@ -152,7 +150,7 @@ class GnutellaProtocol(basic.LineReceiver):
 			header = "{0}&80&{1}&".format(msgid, ttl)
 		else:
 			header = self.buildHeader(80, ttl)
-		message = "{0}{1};".format(header, query)
+		message = "{0}{1}$$$".format(header, query)
 		for cn in globals.connections:
 			if(msgid == None or cn != self):
 				cn.transport.write(message.encode('utf-8'))
@@ -162,9 +160,9 @@ class GnutellaProtocol(basic.LineReceiver):
 		if not utility.isValid(msgid):
 			return
 		if payload:
-			message = "{0}{1};".format(header, payload)
+			message = "{0}{1}$$$".format(header, payload)
 		else:
-			message = "{0}{1}&{2}&{3};".format(header, globals.myFileServerPort, globals.myIP, query)
+			message = "{0}{1}&{2}&{3}$$$".format(header, globals.myFileServerPort, globals.myIP, query)
 		globals.msgRoutes[msgid][0].transport.write(message.encode('utf-8'))
 
 	def handleQuery(self, msgid, ttl, query):
@@ -185,9 +183,10 @@ class GnutellaProtocol(basic.LineReceiver):
 				fileChunk = fp.read(CHUNK_SIZE)
 				if (fileChunk == ""):
 					break
-				payload = "{0}&{1}&{2}&{3}".format(query, chunkNumber, fileChunk, passedNodes)
+				payload = "{0}&{1}&{2}&{3}".format(query, passedNodes, chunkNumber, fileChunk)
 				self.sendFileChunk(msgid, payload)
 				chunkNumber += 1
+			fp.close()
 		else:
 			self.sendQuery(query, msgid, ttl-1)
 			utility.writeLog("Forwarding Query: {0} {1}".format(query, msgid))
@@ -210,23 +209,22 @@ class GnutellaProtocol(basic.LineReceiver):
 		header = "{0}&161&7&".format(msgid)
 		# if not utility.isValid(msgid):
 		# 	return
-		message = "{0}{1};".format(header, payload)
+		message = "{0}{1}$$$".format(header, payload)
 		globals.msgRoutes[msgid][0].transport.write(message.encode('utf-8'))
 
 	def handleFileChunk(self, msgid, payload):
 		peer = self.transport.getPeer()
 		info = payload.split('&', 4)
 		query = info[0]
-		chunkNumber = int(info[1])
-		fileChunk = info[2]
-		info[3] += "{0}:{1} -> ".format(peer.host), peer.port
-		passedNodes = info[3]
+		info[1] += "{0}:{1} -> ".format(peer.host, peer.port)
+		passedNodes = info[1]
+		chunkNumber = int(info[2])
+		fileChunk = info[3]
 		if chunkNumber == 1:
 			print("Getting Chunk {0}:".format(chunkNumber))
-		print("{0}:{1}".format(peer.host), peer.port, end=" -> ")
 		if(msgid.startswith(globals.nodeID)):
 			host = self.transport.getHost()
-			passedNodes += "{0}:{1}".format(host.host), host.port
+			passedNodes += "{0}:{1}".format(host.host, host.port)
 			print(passedNodes)
 			print("Chunk Received")
 			filepath = os.path.join(globals.directory, query)
