@@ -3,6 +3,7 @@ import urllib.request
 from twisted.internet import reactor, protocol
 from twisted.protocols import basic
 from alive_progress import alive_bar
+from tqdm import tqdm
 
 from constants import *
 import globals
@@ -180,15 +181,15 @@ class GnutellaProtocol(basic.LineReceiver):
 			fp = open(filepath, "r")
 			chunkNumber = 1
 			fileSize = os.path.getsize(filepath)
-			with alive_bar(fileSize, tty=True) as bar:
-				while True:
-					fileChunk = fp.read(CHUNK_SIZE)
-					if (fileChunk == ""):
-						break
-					payload = "{0}&{1}&{2}&{3}".format(query, passedNodes, chunkNumber, fileChunk)
-					self.sendFileChunk(msgid, payload)
-					chunkNumber += 1
-					bar()
+			# with tqdm (total=fileSize, desc="Loading…", ascii=False, unit="KB") as progressBar:
+			while True:
+				fileChunk = fp.read(CHUNK_SIZE)
+				if (fileChunk == ""):
+					break
+				payload = "{0}&{1}&{2}&{3}&{4}".format(query, fileSize, passedNodes, chunkNumber, fileChunk)
+				self.sendFileChunk(msgid, payload)
+				chunkNumber += 1
+					# progressBar.update(len(fileChunk))
 				
 			fp.close()
 		else:
@@ -218,19 +219,21 @@ class GnutellaProtocol(basic.LineReceiver):
 
 	def handleFileChunk(self, msgid, payload):
 		peer = self.transport.getPeer()
-		info = payload.split('&', 4)
+		info = payload.split('&', 5)
 		query = info[0]
-		info[1] += "{0}:{1} -> ".format(peer.host, peer.port)
-		passedNodes = info[1]
-		chunkNumber = int(info[2])
-		fileChunk = info[3]
-		if chunkNumber == 1:
-			print("Getting Chunk {0}:".format(chunkNumber))
+		fileSize = int(info[1])
+		info[2] += "{0}:{1} -> ".format(peer.host, peer.port)
+		passedNodes = info[2]
+		chunkNumber = int(info[3])
+		fileChunk = info[4]
+		filepath = os.path.join(globals.directory, query)
 		if(msgid.startswith(globals.nodeID)):
 			host = self.transport.getHost()
 			passedNodes += "{0}:{1}".format(host.host, host.port)
-			print("Chunk Received from path:", passedNodes)
-			filepath = os.path.join(globals.directory, query)
+			# print("Chunk {0} received from path: {1}".format(chunkNumber, passedNodes))
+			if chunkNumber == 1:
+				self.progressBar = tqdm (total=fileSize, desc="Loading…", ascii=False, unit="KB")
+			self.progressBar.update()
 			fp = open(filepath, "a+")
 			fp.write(fileChunk)
 			fp.close()
