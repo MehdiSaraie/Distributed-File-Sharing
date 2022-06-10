@@ -50,7 +50,7 @@ def readInput():
 				if (len(globals.connections) > 0):
 					globals.connections[0].sendQuery(query)
 				else:
-					print("No other nodes in network at the moment")
+					printLine("No other nodes in network at the moment")
 			else:
 				print("File already exists; No need to download")
 		elif(request.startswith("QUIT")):

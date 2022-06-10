@@ -44,12 +44,11 @@ if __name__=="__main__":
 		globals.directory = os.path.join(globals.directory, 'files')
 		if not os.path.exists(globals.directory):
 			os.makedirs(globals.directory)
-		print("Run \"tail -c +0 -f {0}\" in another terminal to see output".format(globals.logPath))
 		printLine("Using directory: {0}".format(globals.directory))
 
 		#Set up Twisted clients
 		if(targetIP and targetPort):
-			print(reactor.connectTCP(targetIP, targetPort, GnutellaFactory(True)))
+			reactor.connectTCP(targetIP, targetPort, GnutellaFactory(True))
 		
 		usedPort = reactor.listenTCP(globals.myPort, GnutellaFactory(), interface=socket.gethostbyname(socket.gethostname()))
 		host = usedPort.getHost()

@@ -2,6 +2,7 @@ import os, time
 import urllib.request
 from twisted.internet import reactor, protocol
 from twisted.protocols import basic
+from alive_progress import alive_bar
 
 from constants import *
 import globals
@@ -45,7 +46,6 @@ class GnutellaProtocol(basic.LineReceiver):
 		lines = data.split("$$$")
 		for line in lines:
 			if (len(line) > 0):
-				print(line)
 				self.handleMessage(line)
 
 	def handleMessage(self, data):
@@ -179,13 +179,17 @@ class GnutellaProtocol(basic.LineReceiver):
 			passedNodes = ""
 			fp = open(filepath, "r")
 			chunkNumber = 1
-			while True:
-				fileChunk = fp.read(CHUNK_SIZE)
-				if (fileChunk == ""):
-					break
-				payload = "{0}&{1}&{2}&{3}".format(query, passedNodes, chunkNumber, fileChunk)
-				self.sendFileChunk(msgid, payload)
-				chunkNumber += 1
+			fileSize = os.path.getsize(filepath)
+			with alive_bar(fileSize, tty=True) as bar:
+				while True:
+					fileChunk = fp.read(CHUNK_SIZE)
+					if (fileChunk == ""):
+						break
+					payload = "{0}&{1}&{2}&{3}".format(query, passedNodes, chunkNumber, fileChunk)
+					self.sendFileChunk(msgid, payload)
+					chunkNumber += 1
+					bar()
+				
 			fp.close()
 		else:
 			self.sendQuery(query, msgid, ttl-1)
@@ -225,8 +229,7 @@ class GnutellaProtocol(basic.LineReceiver):
 		if(msgid.startswith(globals.nodeID)):
 			host = self.transport.getHost()
 			passedNodes += "{0}:{1}".format(host.host, host.port)
-			print(passedNodes)
-			print("Chunk Received")
+			print("Chunk Received from path:", passedNodes)
 			filepath = os.path.join(globals.directory, query)
 			fp = open(filepath, "a+")
 			fp.write(fileChunk)
