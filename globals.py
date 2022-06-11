@@ -12,3 +12,4 @@ myFileServerPort = None
 msgID = 0
 msgRoutes = {}
 netData = []
+ui = None

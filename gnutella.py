@@ -2,8 +2,6 @@ import os, time
 import urllib.request
 from twisted.internet import reactor, protocol
 from twisted.protocols import basic
-from alive_progress import alive_bar
-from tqdm import tqdm
 
 from constants import *
 import globals
@@ -26,6 +24,7 @@ class GnutellaProtocol(basic.LineReceiver):
 	def connectionMade(self):
 		globals.connections.append(self)
 		peer = self.transport.getPeer()
+		globals.ui.addPeerToListWidget(peer.host, peer.port)
 		utility.writeLog("Connected to {0}:{1}\n".format(peer.host, peer.port))
 		if self.initiator:
 			x = "GNUTELLA CONNECT/0.4\n{0}\n$$$".format(globals.myPort)
@@ -39,6 +38,7 @@ class GnutellaProtocol(basic.LineReceiver):
 	def connectionLost(self, reason):
 		globals.connections.remove(self)
 		peer = self.transport.getPeer()
+		globals.ui.removePeerFromListWidget(peer.host, peer.port)
 		utility.writeLog("Disconnected with {0}:{1}\n".format(peer.host, peer.port))
 		utility.makePeerConnection()
 
@@ -72,8 +72,11 @@ class GnutellaProtocol(basic.LineReceiver):
 		else:
 			utility.writeLog("\n")
 			message = data.split('&', 3)
+			if len(message) < 3:
+				print(message)
 			msgid = message[0]
 			payloadDesc = int(message[1])
+			print(payloadDesc)
 			ttl = int(message[2])
 			payload = message[3]
 			if(payloadDesc == 0):
@@ -181,7 +184,6 @@ class GnutellaProtocol(basic.LineReceiver):
 			fp = open(filepath, "r")
 			chunkNumber = 1
 			fileSize = os.path.getsize(filepath)
-			# with tqdm (total=fileSize, desc="Loading…", ascii=False, unit="KB") as progressBar:
 			while True:
 				fileChunk = fp.read(CHUNK_SIZE)
 				if (fileChunk == ""):
@@ -189,7 +191,6 @@ class GnutellaProtocol(basic.LineReceiver):
 				payload = "{0}&{1}&{2}&{3}&{4}".format(query, fileSize, passedNodes, chunkNumber, fileChunk)
 				self.sendFileChunk(msgid, payload)
 				chunkNumber += 1
-					# progressBar.update(len(fileChunk))
 				
 			fp.close()
 		else:
@@ -212,14 +213,14 @@ class GnutellaProtocol(basic.LineReceiver):
 
 	def sendFileChunk(self, msgid, payload):
 		header = "{0}&161&7&".format(msgid)
-		# if not utility.isValid(msgid):
-		# 	return
+		if not utility.isValid(msgid):
+			return
 		message = "{0}{1}$$$".format(header, payload)
 		globals.msgRoutes[msgid][0].transport.write(message.encode('utf-8'))
 
 	def handleFileChunk(self, msgid, payload):
 		peer = self.transport.getPeer()
-		info = payload.split('&', 5)
+		info = payload.split('&', 4)
 		query = info[0]
 		fileSize = int(info[1])
 		info[2] += "{0}:{1} -> ".format(peer.host, peer.port)
@@ -230,13 +231,22 @@ class GnutellaProtocol(basic.LineReceiver):
 		if(msgid.startswith(globals.nodeID)):
 			host = self.transport.getHost()
 			passedNodes += "{0}:{1}".format(host.host, host.port)
-			# print("Chunk {0} received from path: {1}".format(chunkNumber, passedNodes))
+			print("Chunk {0} received from path: {1}".format(chunkNumber, passedNodes))
 			if chunkNumber == 1:
-				self.progressBar = tqdm (total=fileSize, desc="Loading…", ascii=False, unit="KB")
-			self.progressBar.update()
+				self.time = 0
 			fp = open(filepath, "a+")
 			fp.write(fileChunk)
 			fp.close()
+			downloadedSize = (chunkNumber-1) * CHUNK_SIZE + len(fileChunk)
+			isLastChunk = downloadedSize == fileSize or len(fileChunk) < CHUNK_SIZE
+			now = time.time()
+			speed = len(fileChunk) // (now - self.time)
+			self.time = now
+			if (isLastChunk):
+				globals.ui.socketSignal.emit("updateProgressBar&{0}&{1}".format(100, speed))
+				utility.printLine("File Download Completed")
+			else:
+				globals.ui.socketSignal.emit("updateProgressBar&{0}&{1}".format(downloadedSize*100//fileSize, speed))
 		else:
 			payload = "&".join(info)
 			self.sendFileChunk(msgid, payload)
