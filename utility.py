@@ -9,7 +9,6 @@ from gnutella import GnutellaFactory
 GLOBAL HELPER FUNCTIONS
 """
 def makePeerConnection(IP=None, port=None):
-	MAX_CONNS
 	cleanPeerList()
 	numConns = len(globals.connections)
 	if (numConns < MAX_CONNS and len(globals.netData) > 0):

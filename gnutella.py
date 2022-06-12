@@ -1,5 +1,4 @@
 import os, time
-import urllib.request
 from twisted.internet import reactor, protocol
 from twisted.protocols import basic
 
@@ -28,13 +27,10 @@ class GnutellaProtocol(basic.LineReceiver):
 		globals.ui.addPeerToListWidget(peer.host, peer.port)
 		utility.writeLog("Connected to {0}:{1}\n".format(peer.host, peer.port))
 		if self.initiator:
-			x = "GNUTELLA CONNECT/0.4\n{0}\n$$$".format(globals.myPort)
-			self.transport.write(x.encode('utf-8'))
+			self.transport.write("GNUTELLA CONNECT/0.4\n{0}\n$$$".format(globals.myPort).encode('utf-8'))
 			utility.writeLog("Sending GNUTELLA CONNECT to {0}:{1}\n".format(peer.host, peer.port))
 		host = self.transport.getHost()
-		print('line 35', globals.myIP)
 		globals.myIP = host.host
-		print('line 37', globals.myIP)
 
 	def connectionLost(self, reason):
 		globals.connections.remove(self)
@@ -89,9 +85,6 @@ class GnutellaProtocol(basic.LineReceiver):
 			elif(payloadDesc == 80):
 				utility.writeLog("Received Query: msgid={0} ttl={1} query={2}\n".format(msgid, ttl, payload))
 				self.handleQuery(msgid, ttl, payload)
-			elif(payloadDesc == 81):
-				utility.writeLog("Received QueryHit: msgid={0} payload={1}\n".format(msgid, payload))
-				self.handleQueryHit(msgid, payload)
 			elif(payloadDesc == 161):
 				utility.writeLog("Received FileChunk: msgid={0} payload={1}\n".format(msgid, payload))
 				self.handleFileChunk(msgid, payload)
@@ -114,7 +107,6 @@ class GnutellaProtocol(basic.LineReceiver):
 			utility.writeLog("Sending PING: {0}\n".format(message))
 		message = "{0}$$$".format(message)
 		for cn in globals.connections:
-			print('line 116', self.transport.getHost())
 			if(msgid == None or cn != self):
 				cn.transport.write(message.encode('utf-8'))
 
@@ -160,16 +152,6 @@ class GnutellaProtocol(basic.LineReceiver):
 			if(msgid == None or cn != self):
 				cn.transport.write(message.encode('utf-8'))
 
-	def sendQueryHit(self, msgid, query=None, payload=None):
-		header = "{0}&81&7&".format(msgid)
-		if not utility.isValid(msgid):
-			return
-		if payload:
-			message = "{0}{1}$$$".format(header, payload)
-		else:
-			message = "{0}{1}&{2}&{3}$$$".format(header, globals.myFileServerPort, globals.myIP, query)
-		globals.msgRoutes[msgid][0].transport.write(message.encode('utf-8'))
-
 	def handleQuery(self, msgid, ttl, query):
 		if utility.isValid(msgid):
 			return
@@ -179,7 +161,6 @@ class GnutellaProtocol(basic.LineReceiver):
 			return
 		filepath = os.path.join(globals.directory, query)
 		if os.path.isfile(filepath):
-			# self.sendQueryHit(msgid, query=query)
 			utility.writeLog("File found: {0}; Sending File\n".format(query))
 			passedNodes = ""
 			fp = open(filepath, "r")
@@ -197,20 +178,6 @@ class GnutellaProtocol(basic.LineReceiver):
 		else:
 			self.sendQuery(query, msgid, ttl-1)
 			utility.writeLog("Forwarding Query: {0} {1}".format(query, msgid))
-
-	def handleQueryHit(self, msgid, payload):
-		if(msgid.startswith(globals.nodeID)):
-			info = payload.split('&', 2)
-			port = info[0]
-			ip = info[1]
-			query = info[2]
-			print("Found port, ip, file: ", info)
-			filepath = os.path.join(globals.directory, query)
-			if not os.path.isfile(filepath):
-				utility.printLine("Getting file \"{0}\" from {1}:{2}".format(query, ip, port)) 
-				reactor.callInThread(self.getFile, port, ip, query, filepath)
-		else:
-			self.sendQueryHit(msgid, payload=payload)
 
 	def sendFileChunk(self, msgid, payload):
 		header = "{0}&161&7&".format(msgid)
@@ -254,13 +221,6 @@ class GnutellaProtocol(basic.LineReceiver):
 		else:
 			payload = "&".join(info)
 			self.sendFileChunk(msgid, payload)
-
-	def getFile(self, port, ip, query, filepath):
-		url = "http://{0}:{1}/{2}".format(ip, port, query)
-		fp = open(filepath, "w")
-		fp.write(bytes.decode(urllib.request.urlopen(url).read()))
-		fp.close()
-
 
 class GnutellaFactory(protocol.ReconnectingClientFactory):
 	def __init__(self, isInitiator=False):
