@@ -16,7 +16,7 @@ class GnutellaProtocol(basic.LineReceiver):
 		self.normalizeNewlines = True
 		self.initiator = False
 		self.verified = True
-		self.lastReceivedChunk = None
+		self.lastReceivedChunk = {}
 
 	def setInitiator(self):
 		self.initiator = True
@@ -230,9 +230,9 @@ class GnutellaProtocol(basic.LineReceiver):
 		fileChunk = info[4]
 		filepath = os.path.join(globals.directory, query)
 		if(msgid.startswith(globals.nodeID)):
-			if(self.lastReceivedChunk != None and chunkNumber != self.lastReceivedChunk + 1):
+			if(chunkNumber != self.lastReceivedChunk.get(msgid, 0) + 1):
 				return
-			self.lastReceivedChunk = chunkNumber
+			self.lastReceivedChunk[msgid] = chunkNumber
 			host = self.transport.getHost()
 			passedNodes += "{0}:{1}".format(host.host, host.port)
 			print("Chunk {0} received from path: {1}".format(chunkNumber, passedNodes))
