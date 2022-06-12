@@ -69,11 +69,8 @@ class GnutellaProtocol(basic.LineReceiver):
 		else:
 			utility.writeLog("\n")
 			message = data.split('&', 3)
-			if len(message) < 3:
-				print(message)
 			msgid = message[0]
 			payloadDesc = int(message[1])
-			print(payloadDesc)
 			ttl = int(message[2])
 			payload = message[3]
 			if(payloadDesc == 0):
