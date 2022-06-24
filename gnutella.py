@@ -24,7 +24,8 @@ class GnutellaProtocol(basic.LineReceiver):
 	def connectionMade(self):
 		globals.connections.append(self)
 		peer = self.transport.getPeer()
-		globals.ui.addPeerToListWidget(peer.host, peer.port)
+		if (globals.ui != None):
+			globals.ui.addPeerToListWidget(peer.host, peer.port)
 		utility.writeLog("Connected to {0}:{1}\n".format(peer.host, peer.port))
 		if self.initiator:
 			self.transport.write("GNUTELLA CONNECT/0.4\n{0}\n$$$".format(globals.myPort).encode('utf-8'))
@@ -35,7 +36,8 @@ class GnutellaProtocol(basic.LineReceiver):
 	def connectionLost(self, reason):
 		globals.connections.remove(self)
 		peer = self.transport.getPeer()
-		globals.ui.removePeerFromListWidget(peer.host, peer.port)
+		if (globals.ui != None):
+			globals.ui.removePeerFromListWidget(peer.host, peer.port)
 		utility.writeLog("Disconnected with {0}:{1}\n".format(peer.host, peer.port))
 		utility.makePeerConnection()
 
@@ -211,10 +213,12 @@ class GnutellaProtocol(basic.LineReceiver):
 			speed = len(fileChunk) // (now - self.time)
 			self.time = now
 			if (isLastChunk):
-				globals.ui.socketSignal.emit("updateProgressBar&{0}&{1}".format(100, speed))
+				if (globals.ui != None):
+					globals.ui.socketSignal.emit("updateProgressBar&{0}&{1}".format(100, speed))
 				utility.printLine("File Download Completed")
 			else:
-				globals.ui.socketSignal.emit("updateProgressBar&{0}&{1}".format(downloadedSize*100//fileSize, speed))
+				if (globals.ui != None):
+					globals.ui.socketSignal.emit("updateProgressBar&{0}&{1}".format(downloadedSize*100//fileSize, speed))
 		else:
 			payload = "&".join(info)
 			self.sendFileChunk(msgid, payload)

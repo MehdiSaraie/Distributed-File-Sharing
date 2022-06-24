@@ -4,6 +4,7 @@ from twisted.web.server import Site
 from twisted.web.static import File
 from twisted.internet import reactor
 from threading import Thread
+from netifaces import interfaces, ifaddresses, AF_INET
 
 import globals
 from utility import printLine
@@ -170,6 +171,12 @@ def showWindow():
 	MainWindow.show()
 	sys.exit(app.exec_())
 
+def getMyIP():
+	for ifaceName in interfaces():
+		for i in ifaddresses(ifaceName).setdefault(AF_INET, [{'addr':'No IP addr'}]):
+			if i['addr'].startswith('192'):
+				return i['addr']
+
 if __name__ == "__main__":
 	globals.directory = '.'
 	if globals.directory:
@@ -183,7 +190,7 @@ if __name__ == "__main__":
 			os.makedirs(globals.directory)
 		printLine("Using directory: {0}".format(globals.directory))
 		
-		usedPort = reactor.listenTCP(globals.myPort, GnutellaFactory(), interface=socket.gethostbyname(socket.gethostname()))
+		usedPort = reactor.listenTCP(globals.myPort, GnutellaFactory(), interface=getMyIP())
 		host = usedPort.getHost()
 		globals.myIP = host.host
 		globals.myPort = host.port
@@ -198,6 +205,3 @@ if __name__ == "__main__":
 		showWindow()
 	else:
 		print("Must give a directory path")
-	
-
-	

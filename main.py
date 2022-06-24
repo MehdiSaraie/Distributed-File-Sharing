@@ -3,11 +3,18 @@ from uuid import getnode as getmac
 from twisted.web.server import Site
 from twisted.web.static import File
 from twisted.internet import reactor
+from netifaces import interfaces, ifaddresses, AF_INET
 
 # from globals import *
 import globals
 from utility import printLine, readInput
 from gnutella import GnutellaFactory
+
+def getMyIP():
+	for ifaceName in interfaces():
+		for i in ifaddresses(ifaceName).setdefault(AF_INET, [{'addr':'No IP addr'}]):
+			if i['addr'].startswith('192'):
+				return i['addr']
 
 """
 MAIN FUNCTION
@@ -50,7 +57,7 @@ if __name__=="__main__":
 		if(targetIP and targetPort):
 			reactor.connectTCP(targetIP, targetPort, GnutellaFactory(True))
 		
-		usedPort = reactor.listenTCP(globals.myPort, GnutellaFactory(), interface=socket.gethostbyname(socket.gethostname()))
+		usedPort = reactor.listenTCP(globals.myPort, GnutellaFactory(), interface=getMyIP())
 		host = usedPort.getHost()
 		globals.myIP = host.host
 		globals.myPort = host.port
