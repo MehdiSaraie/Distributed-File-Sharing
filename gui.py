@@ -49,6 +49,12 @@ class Ui_MainWindow(QtCore.QObject, object):
 		self.downloadButton.setIconSize(QtCore.QSize(20, 20))
 		self.downloadButton.clicked.connect(lambda : self.sendQuery())
 		self.progressBar = QProgressBar(self.centralwidget)
+		self.similarFilesLabel = QLabel(self.centralwidget)
+		self.similarFilesLabel.setGeometry(QtCore.QRect(40, 170, 100, 30))
+		self.similarFilesLabel.setObjectName("similarFilesLabel")
+		self.similarFilesListWidget = QListWidget(self.centralwidget)
+		self.similarFilesListWidget.setGeometry(QtCore.QRect(40, 205, 290, 192))
+		self.similarFilesListWidget.setObjectName("similarFilesList")
 		self.progressBar.setGeometry(QtCore.QRect(35, 520, 300, 23))
 		self.progressBar.setValue(0)
 		self.progressBar.setTextVisible(True)
@@ -105,6 +111,7 @@ class Ui_MainWindow(QtCore.QObject, object):
 		_translate = QtCore.QCoreApplication.translate
 		MainWindow.setWindowTitle(_translate("MainWindow", "MainWindow"))
 		self.fileNameLabel.setText(_translate("MainWindow", "File Name:"))
+		self.similarFilesLabel.setText(_translate("MainWindow", "Similar Files"))
 		self.peersLabel.setText(_translate("MainWindow", "Peers"))
 		self.ipLineEdit.setPlaceholderText(_translate("MainWindow", " IP"))
 		self.portLineEdit.setPlaceholderText(_translate("MainWindow", " Port"))
@@ -135,9 +142,10 @@ class Ui_MainWindow(QtCore.QObject, object):
 		self.portLineEdit.setText("")
 
 	def sendQuery(self):
+		# clear
 		query = self.fileNameLineEdit.text()
 		print(query)
-		filepath = os.path.join(globals.directory, query)
+		filepath = os.path.join(globals.directory, query) 
 		if not os.path.isfile(filepath):
 			if (len(globals.connections) > 0):
 				globals.connections[0].sendQuery(query)
@@ -158,7 +166,14 @@ class Ui_MainWindow(QtCore.QObject, object):
 			if item.text() == ip + ":" + str(port):
 				self.peersListWidget.takeItem(self.peersListWidget.row(item))
 				break
+	
+	def flushSimilarsListWidget(self):
+		self.similarFilesListWidget.clear()
 
+	def addSimilarFilesListWidget(self, file_names):
+		for file_name in file_names:
+			self.similarFilesListWidget.addItem(file_name)
+	
 	def updateProgressBar(self, value, speed):
 		self.progressBar.setValue(value)
 		self.speedLabel.setText(str(speed) + " bps")

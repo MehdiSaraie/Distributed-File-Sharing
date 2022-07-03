@@ -5,6 +5,7 @@ from twisted.protocols import basic
 from constants import *
 import globals
 import utility
+import difflib
 
 """
 GNUTELLA TWISTED CLASSES
@@ -87,6 +88,9 @@ class GnutellaProtocol(basic.LineReceiver):
 			elif(payloadDesc == 161):
 				utility.writeLog("Received FileChunk: msgid={0} payload={1}\n".format(msgid, payload))
 				self.handleFileChunk(msgid, payload)
+			elif(payloadDesc == 170):
+				utility.writeLog("Received SimilarFiles: msgid={0} ttl={1} payload={2}\n".format(msgid, ttl, payload))
+				self.handleSimilarFiles(msgid, ttl, payload)
 
 	def buildHeader(self, descrip, ttl):
 		header = "{0}{1:03}".format(globals.nodeID, globals.msgID)
@@ -140,6 +144,8 @@ class GnutellaProtocol(basic.LineReceiver):
 			utility.makePeerConnection()
 
 	def sendQuery(self, query, msgid=None, ttl=7):
+		if (globals.ui != None):
+			globals.ui.flushSimilarsListWidget()
 		if(ttl <= 0):
 			return
 		if(msgid):
@@ -158,8 +164,15 @@ class GnutellaProtocol(basic.LineReceiver):
 		if "../" in query:
 			print("Cannot request files in upper directories")
 			return
+		
+		dir_list = os.listdir(globals.directory)
+		most_similar_contents = difflib.get_close_matches(query, dir_list)
+		print(most_similar_contents)
+		self.sendSimilarFiles(msgid, most_similar_contents)
+
 		filepath = os.path.join(globals.directory, query)
 		if os.path.isfile(filepath):
+			print(filepath)
 			utility.writeLog("File found: {0}; Sending File\n".format(query))
 			passedNodes = ""
 			fp = open(filepath, "r")
@@ -178,11 +191,23 @@ class GnutellaProtocol(basic.LineReceiver):
 			self.sendQuery(query, msgid, ttl-1)
 			utility.writeLog("Forwarding Query: {0} {1}".format(query, msgid))
 
+	def handleSimilarFiles(self, msgid, ttl, similar_files):
+		similar_files_list = similar_files.split("+")
+		if (globals.ui != None):
+			globals.ui.addSimilarFilesListWidget(similar_files_list)
+
 	def sendFileChunk(self, msgid, payload):
 		header = "{0}&161&7&".format(msgid)
 		if not utility.isValid(msgid):
 			return
 		message = "{0}{1}$$$".format(header, payload)
+		globals.msgRoutes[msgid][0].transport.write(message.encode('utf-8'))
+	
+	def sendSimilarFiles(self, msgid, file_names):
+		header = "{0}&170&7&".format(msgid)
+		if not utility.isValid(msgid):
+			return
+		message = "{0}{1}$$$".format(header, "+".join(file_names))
 		globals.msgRoutes[msgid][0].transport.write(message.encode('utf-8'))
 
 	def handleFileChunk(self, msgid, payload):
